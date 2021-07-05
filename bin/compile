@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+echo "-----> Adding precompiled assets"
+
+ENV_DIR=${3:-}
+
+export_env_dir() {
+  env_dir=$1
+  acceptlist_regex=${2:-''}
+  denylist_regex=${3:-'^(PATH|GIT_DIR|CPATH|CPPATH|LD_PRELOAD|LIBRARY_PATH)$'}
+  if [ -d "$env_dir" ]; then
+    for e in $(ls $env_dir); do
+      echo "$e" | grep -E "$acceptlist_regex" | grep -qvE "$denylist_regex" &&
+      export "$e=$(cat $env_dir/$e)"
+      :
+    done
+  fi
+}
+
+# Export env
+export_env_dir "$ENV_DIR"
+
+cd $1
+
+BUILD_NUM=null
+LOOP_COUNT=0
+
+RECENT_BUILDS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v1.1/project/github/amitree/amitree/tree/$HEROKU_BRANCH?shallow=true)
+
+while [ $BUILD_NUM == null ]; do
+  for e in $(echo "${RECENT_BUILDS}" | jq -r '.[] | @base64'); do
+
+    _jq() {
+      echo "${e}" | base64 --decode | jq -r "${1}"
+    }
+
+    # Set each property of the row to a variable
+    vcs_revision=$(_jq '.vcs_revision')
+    job_name=$(_jq '.workflows.job_name')
+
+    # Utilize variables
+    echo "$vcs_revision = $job_name"
+
+    if [ $vcs_revision == $SOURCE_VERSION ] && [ $job_name == "artifacts" ]; then
+      BUILD_NUM=$(_jq '.build_num')
+      break
+    fi
+  done
+  LOOP_COUNT=$(( $LOOP_COUNT + 1 ))
+
+  echo $LOOP_COUNT
+
+  if [ $LOOP_COUNT -ge 5 ] || [ $BUILD_NUM != null ]; then break; fi
+
+  sleep 3m
+done
+
+echo $BUILD_NUM
+
+curl -H "Circle-Token: $CIRCLE_CI_AUTH" -L https://circleci.com/api/v1.1/project/github/amitree/amitree/$BUILD_NUM/artifacts/0/compiled_assets.zip --output compiled_assets.zip
+curl -H "Circle-Token: $CIRCLE_CI_AUTH" -L https://circleci.com/api/v1.1/project/github/amitree/amitree/$BUILD_NUM/artifacts/0/compiled_tmp_assets.zip --output compiled_tmp_assets.zip
+
+# unzip the assets to the approprait directory
+unzip compiled_assets.zip
+unzip compiled_tmp_assets.zip
+
+# delete zipped file
+rm compiled_assets.zip
+rm compiled_tmp_assets.zip
+
+echo "-----> Done adding precompiled assets"
