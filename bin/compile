@@ -56,8 +56,9 @@ done
 
 echo $BUILD_NUM
 
-curl -H "Circle-Token: $CIRCLE_CI_AUTH" -L https://circleci.com/api/v1.1/project/github/amitree/amitree/$BUILD_NUM/artifacts/0/compiled_assets.zip --output compiled_assets.zip
-curl -H "Circle-Token: $CIRCLE_CI_AUTH" -L https://circleci.com/api/v1.1/project/github/amitree/amitree/$BUILD_NUM/artifacts/0/compiled_tmp_assets.zip --output compiled_tmp_assets.zip
+curl -H "Circle-Token: $CIRCLE_CI_AUTH" -L https://circleci.com/api/v1.1/project/github/amitree/amitree/$BUILD_NUM/artifacts/ | \
+grep -o 'https://.*compiled[a-z/._]*' | \
+wget --verbose --header "Circle-Token: $CIRCLE_CI_AUTH" --input-file -
 
 # unzip the assets to the approprait directory
 unzip compiled_assets.zip
