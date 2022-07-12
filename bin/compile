@@ -23,8 +23,9 @@ cd $1
 
 BUILD_NUM=null
 LOOP_COUNT=0
+HEROKU_BRANCH="${HEROKU_BRANCH:-master}"
 
-RECENT_BUILDS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v1.1/project/github/amitree/amitree/tree/${HEROKU_BRANCH:-master}?shallow=true)
+RECENT_BUILDS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v1.1/project/github/amitree/amitree/tree/$HEROKU_BRANCH?shallow=true)
 
 while [ $BUILD_NUM == null ]; do
   for e in $(echo "${RECENT_BUILDS}" | jq -r '.[] | @base64'); do
