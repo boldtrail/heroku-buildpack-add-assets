@@ -54,7 +54,7 @@ while [ $BUILD_NUM == null ]; do
 
   echo "Attempt: $LOOP_COUNT"
 
-  if [ $LOOP_COUNT -ge 6 ] || [ $BUILD_NUM != null ]; then break; fi
+  if [ $LOOP_COUNT -ge 11 ] || [ $BUILD_NUM != null ]; then break; fi
 
   echo "... Waiting 3 minutes to attempt searching build number again ..."
   sleep 3m
