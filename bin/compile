@@ -25,7 +25,7 @@ BUILD_NUM=null
 LOOP_COUNT=0
 BRANCH=${HEROKU_BRANCH:-master}
 
-echo $BRANCH
+echo "$BRANCH - $SOURCE_VERSION"
 
 RECENT_BUILDS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v1.1/project/github/amitree/amitree/tree/$BRANCH?shallow=true)
 
