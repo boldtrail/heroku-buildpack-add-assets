@@ -52,14 +52,14 @@ while [ $BUILD_NUM == null ]; do
   done
   LOOP_COUNT=$(( $LOOP_COUNT + 1 ))
 
-  echo $LOOP_COUNT
+  echo "Attempt: $LOOP_COUNT"
 
   if [ $LOOP_COUNT -ge 5 ] || [ $BUILD_NUM != null ]; then break; fi
 
   sleep 3m
 done
 
-echo $BUILD_NUM
+echo "Found build number: $BUILD_NUM"
 
 curl -H "Circle-Token: $CIRCLE_CI_AUTH" -L https://circleci.com/api/v1.1/project/github/amitree/amitree/$BUILD_NUM/artifacts/ | \
 grep -o 'https://.*compiled[a-z/._]*' | \
