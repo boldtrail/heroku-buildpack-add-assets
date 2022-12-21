@@ -54,12 +54,18 @@ while [ $BUILD_NUM == null ]; do
 
   echo "Attempt: $LOOP_COUNT"
 
-  if [ $LOOP_COUNT -ge 5 ] || [ $BUILD_NUM != null ]; then break; fi
+  if [ $LOOP_COUNT -ge 6 ] || [ $BUILD_NUM != null ]; then break; fi
 
+  echo "... Waiting 3 minutes to attempt searching build number again ..."
   sleep 3m
 done
 
 echo "Found build number: $BUILD_NUM"
+if [ $BUILD_NUM == null ]; then
+  echo "-----> Failed as no build number was found for revision: $SOURCE_VERSION"
+  exit 1
+fi
+
 
 curl -H "Circle-Token: $CIRCLE_CI_AUTH" -L https://circleci.com/api/v1.1/project/github/amitree/amitree/$BUILD_NUM/artifacts/ | \
 grep -o 'https://.*compiled[a-z/._]*' | \
