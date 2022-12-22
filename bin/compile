@@ -16,62 +16,111 @@ export_env_dir() {
   fi
 }
 
+pipeline_for_current_revision() {
+  PIPELINES=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v2/project/gh/amitree/amitree/pipeline?branch=$BRANCH)
+  echo "Pipelines: $PIPELINES"
+
+  PIPELINE=$(echo "${PIPELINES}" | jq -cr "[.items[] | select(.vcs.revision == \"$SOURCE_VERSION\")] | first")
+  echo "Pipeline: $PIPELINE"
+
+  PIPELINE_ID=$(echo "${PIPELINE}" | jq -r '.id')
+  if [ $PIPELINE_ID == null ]; then
+    echo "-----> Failed as no pipeline was found for branch: '$BRANCH' and revision: '$SOURCE_VERSION'"
+    exit 1
+  fi
+}
+
+workflows_for_pipeline() {
+  WORKFLOWS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v2/pipeline/$PIPELINE_ID/workflow)
+  echo "Workflows: $WORKFLOWS"
+
+  WORKFLOW_ID=$(echo "${WORKFLOWS}" | jq -r '.items | first | .id')
+
+  if [ $WORKFLOW_ID == null ]; then
+    echo "-----> Failed as no workflow was found for pipeline: '$PIPELINE_ID'"
+    exit 1
+  fi
+}
+
+artifacts_job_for_workflow() {
+  JOBS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v2/workflow/$WORKFLOW_ID/job)
+  echo "Jobs: $JOBS"
+
+  JOB=$(echo "${JOBS}" | jq -cr '[.items[] | select(.name == "artifacts")] | first')
+  echo "Job: $JOB"
+
+  JOB_NUMBER=$(echo "${JOB}" | jq -r '.job_number')
+  JOB_STATUS=$(echo "${JOB}" | jq -r '.status')
+
+  if [ $JOB_NUMBER == null ] && [ $JOB_STATUS == null ]; then
+    echo "-----> Failed as no artifacts job was found for workflow: '$WORKFLOW_ID'"
+    exit 1
+  fi
+}
+
+artifacts_for_job() {
+  ARTIFACTS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v2/project/gh/amitree/amitree/$JOB_NUMBER/artifacts)
+  echo "Artifacts: $ARTIFACTS"
+
+  ARTIFACT_URLS=$(echo "${ARTIFACTS}" | jq -r '.items[] | .url')
+
+  if [ -z "$ARTIFACT_URLS" ]; then
+    echo "-----> Failed as no artifacts were found for job: '$JOB_NUMBER'"
+    exit 1
+  fi
+}
+
 # Export env
 export_env_dir "$ENV_DIR"
 
 cd $1
 
-BUILD_NUM=null
+PIPELINE_ID=null
+WORKFLOW_ID=null
+JOB_NUMBER=null
+JOB_STATUS=null
+ARTIFACT_URLS=null
+
 LOOP_COUNT=0
 BRANCH=${HEROKU_BRANCH:-master}
 
 echo "$BRANCH - $SOURCE_VERSION"
 
-RECENT_BUILDS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v1.1/project/github/amitree/amitree/tree/$BRANCH?shallow=true)
+echo "... Searching for Circle Ci pipeline ..."
+pipeline_for_current_revision
 
-echo $RECENT_BUILDS
+echo "... Searching for Circle Ci workflow ..."
+workflows_for_pipeline
 
-while [ $BUILD_NUM == null ]; do
-  for e in $(echo "${RECENT_BUILDS}" | jq -r '.[] | @base64'); do
-
-    _jq() {
-      echo "${e}" | base64 --decode | jq -r "${1}"
-    }
-
-    # Set each property of the row to a variable
-    vcs_revision=$(_jq '.vcs_revision')
-    job_name=$(_jq '.workflows.job_name')
-
-    # Utilize variables
-    echo "$vcs_revision = $job_name"
-
-    if [ $vcs_revision == $SOURCE_VERSION ] && [ $job_name == "artifacts" ]; then
-      BUILD_NUM=$(_jq '.build_num')
-      break
-    fi
-  done
+while : ; do
   LOOP_COUNT=$(( $LOOP_COUNT + 1 ))
 
-  echo "Attempt: $LOOP_COUNT"
+  echo "... Searching for Circle Ci artifacts job ..."
+  artifacts_job_for_workflow
+  echo "Attempt: $LOOP_COUNT - Current job status: $JOB_STATUS"
 
-  if [ $LOOP_COUNT -ge 11 ] || [ $BUILD_NUM != null ]; then break; fi
+  if [ $JOB_STATUS != 'running' ] && [ $JOB_STATUS != 'queued' ] && [ $JOB_STATUS != 'blocked' ]; then
+    break
+  fi
+
+  if [ $LOOP_COUNT -ge 6 ]; then
+    echo "-----> Failed as the artifacts job didn't start/finish yet"
+    exit 1
+  fi 
 
   echo "... Waiting 3 minutes to attempt searching build number again ..."
   sleep 3m
 done
 
-echo "Found build number: $BUILD_NUM"
-if [ $BUILD_NUM == null ]; then
-  echo "-----> Failed as no build number was found for revision: $SOURCE_VERSION"
-  exit 1
-fi
+echo "... Searching for Circle Ci job's artifacts ..."
+artifacts_for_job
 
-
-curl -H "Circle-Token: $CIRCLE_CI_AUTH" -L https://circleci.com/api/v1.1/project/github/amitree/amitree/$BUILD_NUM/artifacts/ | \
+echo "... Downloading artifacts ..."
+echo "$ARTIFACT_URLS" | \
 grep -o 'https://.*compiled[a-z/._]*' | \
 wget --verbose --header "Circle-Token: $CIRCLE_CI_AUTH" --input-file -
 
-# unzip the assets to the approprait directory
+unzip the assets to the approprait directory
 unzip compiled_assets.zip
 unzip compiled_tmp_assets.zip
 
