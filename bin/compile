@@ -103,7 +103,7 @@ while : ; do
     break
   fi
 
-  if [ $LOOP_COUNT -ge 6 ]; then
+  if [ $LOOP_COUNT -ge 9 ]; then
     echo "-----> Failed as the artifacts job didn't start/finish yet"
     exit 1
   fi 
