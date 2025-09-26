@@ -17,7 +17,7 @@ export_env_dir() {
 }
 
 pipeline_for_current_revision() {
-  PIPELINES=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v2/project/gh/amitree/amitree/pipeline?branch=$BRANCH)
+  PIPELINES=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v2/project/gh/boldtrail/amitree/pipeline?branch=$BRANCH)
   echo "Pipelines: $PIPELINES"
 
   PIPELINE=$(echo "${PIPELINES}" | jq -cr "[.items[] | select(.vcs.revision == \"$SOURCE_VERSION\")] | first")
@@ -59,7 +59,7 @@ artifacts_job_for_workflow() {
 }
 
 artifacts_for_job() {
-  ARTIFACTS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v2/project/gh/amitree/amitree/$JOB_NUMBER/artifacts)
+  ARTIFACTS=$(curl -H "Circle-Token: $CIRCLE_CI_AUTH" https://circleci.com/api/v2/project/gh/boldtrail/amitree/$JOB_NUMBER/artifacts)
   echo "Artifacts: $ARTIFACTS"
 
   ARTIFACT_URLS=$(echo "${ARTIFACTS}" | jq -r '.items[] | .url')
